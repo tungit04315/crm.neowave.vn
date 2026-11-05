@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSuperAdmin() { return request.auth != null && request.auth.token.role == 'super_admin'; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function active() { return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && me().status == 'active'; }
+    function sameOrg(org) { return active() && me().organizationId == org; }
+    function canWrite() { return me().role in ['super_admin', 'director', 'manager', 'sales']; }
+
+    match /users/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isSuperAdmin());
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt', 'updatedAt']);
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+    }
+
+    match /customers/{id} {
+      allow read: if sameOrg(resource.data.organizationId);
+      allow create: if sameOrg(request.resource.data.organizationId) && canWrite() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if sameOrg(resource.data.organizationId) && canWrite()
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.code == resource.data.code;
+      allow delete: if false; // chỉ xóa mềm
+    }
+
+    match /leads/{id} {
+      allow read: if sameOrg(resource.data.organizationId);
+      allow create: if sameOrg(request.resource.data.organizationId) && canWrite() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if sameOrg(resource.data.organizationId) && canWrite()
+        && request.resource.data.organizationId == resource.data.organizationId && request.resource.data.code == resource.data.code;
+      allow delete: if false;
+    }
+
+    match /contacts/{id} {
+      allow read: if sameOrg(resource.data.organizationId);
+      allow create: if sameOrg(request.resource.data.organizationId) && canWrite();
+      allow update: if sameOrg(resource.data.organizationId) && canWrite()
+        && request.resource.data.organizationId == resource.data.organizationId && request.resource.data.customerId == resource.data.customerId;
+      allow delete: if false;
+    }
+
+    match /customerGroups/{id} {
+      allow read: if sameOrg(resource.data.organizationId);
+      allow create: if sameOrg(request.resource.data.organizationId) && canWrite() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if sameOrg(resource.data.organizationId) && canWrite()
+        && request.resource.data.organizationId == resource.data.organizationId && request.resource.data.code == resource.data.code;
+      allow delete: if false;
+    }
+
+    match /customerGroupMembers/{id} {
+      function groupOk(g) { return get(/databases/$(database)/documents/customerGroups/$(g)).data.organizationId == me().organizationId; }
+      allow read: if sameOrg(resource.data.organizationId);
+      // Chỉ Quản trị viên (super_admin) được đổi nhóm của khách hàng. Dùng vai trò trong hồ sơ users/{uid} (me().role), không dùng custom claim.
+      function isAdminNow() { return me().role == 'super_admin'; }
+      allow create, update: if sameOrg(request.resource.data.organizationId) && isAdminNow() && groupOk(request.resource.data.groupId)
+        && id == request.resource.data.groupId + '_' + request.resource.data.customerId;
+      allow delete: if sameOrg(resource.data.organizationId) && isAdminNow();
+    }
+
+    match /activities/{id} {
+      allow read: if sameOrg(resource.data.organizationId);
+      allow create: if sameOrg(request.resource.data.organizationId) && canWrite() && request.resource.data.createdBy == request.auth.uid;
+      // Sales chỉ sửa/xóa mềm tương tác của mình; quản lý trở lên sửa được tất cả
+      allow update: if sameOrg(resource.data.organizationId) && canWrite()
+        && (resource.data.createdBy == request.auth.uid || me().role in ['super_admin', 'director', 'manager'])
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.customerId == resource.data.customerId
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if false;
+    }
+
+    // Cơ hội bán hàng: chỉ máy chủ (Admin SDK qua REST API) được đọc/ghi. Trình duyệt bị từ chối hoàn toàn.
+    match /opportunities/{id} {
+      allow read, write: if false;
+      match /history/{hid} { allow read, write: if false; }
+    }
+
+    // Cấu hình giai đoạn bán hàng: chỉ máy chủ (Admin SDK qua REST API) được đọc/ghi.
+    match /salesConfig/{orgId} {
+      allow read, write: if false;
+      match /history/{hid} { allow read, write: if false; }
+    }
+
+    // Sản phẩm & Dịch vụ: chỉ máy chủ (Admin SDK qua REST API) được đọc/ghi, kể cả subcollection history / priceHistory.
+    match /catalogItems/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /catalogCategories/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /catalogUnits/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /priceLists/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /groupPrices/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /groupPriorities/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /discountPolicies/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /priceLog/{id} { allow read, write: if false; }
+    match /priceChangeRequests/{id} { allow read, write: if false; }
+    match /taxRates/{id} { allow read, write: if false; match /{sub=**} { allow read, write: if false; } }
+    match /priceChangeRequests/{id} { allow read, write: if false; }
+    match /catalogCodes/{id} { allow read, write: if false; }
+
+    match /counters/{cid} {
+      allow read, write: if active() && canWrite() && (cid == me().organizationId + '_customer' || cid == me().organizationId + '_lead' || cid == me().organizationId + '_group' || cid == me().organizationId + '_activity');
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

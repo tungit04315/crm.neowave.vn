@@ -1,0 +1,5 @@
+
+/* Tailwind v4: đặt lại màu viền mặc định (mặc định là đen) thành xám nhạt */
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button { border-color: var(--color-slate-200, #e2e8f0); }
+}

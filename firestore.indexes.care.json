@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizationId", "order": "ASCENDING" }, { "fieldPath": "receivedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizationId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "receivedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizationId", "order": "ASCENDING" }, { "fieldPath": "departmentId", "order": "ASCENDING" }, { "fieldPath": "receivedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "supportTickets", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizationId", "order": "ASCENDING" }, { "fieldPath": "departmentId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "receivedAt", "order": "DESCENDING" } ] }
+  ],
+  "fieldOverrides": []
+}
